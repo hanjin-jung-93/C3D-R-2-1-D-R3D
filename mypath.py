@@ -15,10 +15,19 @@ class Path(object):
 
             output_dir = '/path/to/VAR/hmdb51'
 
+
+            return root_dir, output_dir
+        elif database == 'mydata':
+            # folder that contains class labels
+            root_dir = '/workspace/data/myrawdata'
+
+            output_dir = '/workspace/data/mydata'
+
             return root_dir, output_dir
         else:
             print('Database {} not available.'.format(database))
             raise NotImplementedError
+
 
     @staticmethod
     def model_dir():

@@ -1,5 +1,7 @@
 import os
 from sklearn.model_selection import train_test_split
+import sys
+sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 
 import torch
 import cv2
@@ -67,6 +69,11 @@ class VideoDataset(Dataset):
                 with open('dataloaders/hmdb_labels.txt', 'w') as f:
                     for id, label in enumerate(sorted(self.label2index)):
                         f.writelines(str(id+1) + ' ' + label + '\n')
+        elif dataset == 'mydata':
+            if not os.path.exists('dataloaders/mydata_labels.txt'):
+                with open('dataloaders/mydata_labels.txt', 'w') as f:
+                    for id, label in enumerate(sorted(self.label2index)):
+                        f.writelines(str(id+1) + ' ' + label + '\n')
 
 
     def __len__(self):
@@ -78,9 +85,9 @@ class VideoDataset(Dataset):
         buffer = self.crop(buffer, self.clip_len, self.crop_size)
         labels = np.array(self.label_array[index])
 
-        if self.split == 'test':
-            # Perform data augmentation
-            buffer = self.randomflip(buffer)
+        # if self.split == 'test':
+        #     # Perform data augmentation
+        #     buffer = self.randomflip(buffer)
         buffer = self.normalize(buffer)
         buffer = self.to_tensor(buffer)
         return torch.from_numpy(buffer), torch.from_numpy(labels)
@@ -139,8 +146,8 @@ class VideoDataset(Dataset):
             if not os.path.exists(test_dir):
                 os.mkdir(test_dir)
 
-            for video in train:
-                self.process_video(video, file, train_dir)
+            # for video in train:
+            #     self.process_video(video, file, train_dir)
 
             for video in val:
                 self.process_video(video, file, val_dir)
@@ -244,7 +251,7 @@ class VideoDataset(Dataset):
 
 if __name__ == "__main__":
     from torch.utils.data import DataLoader
-    train_data = VideoDataset(dataset='ucf101', split='test', clip_len=8, preprocess=False)
+    train_data = VideoDataset(dataset='mydata', split='train', clip_len=8, preprocess=False)
     train_loader = DataLoader(train_data, batch_size=100, shuffle=True, num_workers=4)
 
     for i, sample in enumerate(train_loader):
