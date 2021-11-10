@@ -18,11 +18,21 @@ import gc
 gc.collect()
 torch.cuda.empty_cache()
 
-# Use GPU if available else revert to CPU
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-print("Device being used:", device)
+# # Use GPU if available else revert to CPU
+# device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+# print("Device being used:", device)
 
-nEpochs = 100  # Number of epochs for training
+# # Use Multi GPU if available else revert to CPU
+os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
+os.environ["CUDA_VISIBLE_DEVICES"]= "0,1,2,3"
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+print("Device being used:", device)
+print('Count of using GPUs:', torch.cuda.device_count())   # result: 2 (2, 3 use two gpu)
+print('Current cuda device:', torch.cuda.current_device())  # result: 2 (2, 3)
+
+nEpochs = 300  # Number of epochs for training
 resume_epoch = 0  # Default is 0, change if want to resume
 useTest = True # See evolution of the test set when training
 nTestInterval = 20 # Run on test set every nTestInterval epochs
@@ -93,6 +103,8 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
         optimizer.load_state_dict(checkpoint['opt_dict'])
 
     print('Total params: %.2fM' % (sum(p.numel() for p in model.parameters()) / 1000000.0))
+    if torch.cuda.device_count() > 1:
+        model = nn.DataParallel(model)
     model.to(device)
     criterion.to(device)
 
@@ -100,9 +112,9 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
     writer = SummaryWriter(log_dir=log_dir)
 
     print('Training model on {} dataset...'.format(dataset))
-    train_dataloader = DataLoader(VideoDataset(dataset=dataset, split='train',clip_len=16), batch_size=20, shuffle=True, num_workers=4)
-    val_dataloader   = DataLoader(VideoDataset(dataset=dataset, split='val',  clip_len=16), batch_size=20, num_workers=4)
-    test_dataloader  = DataLoader(VideoDataset(dataset=dataset, split='test', clip_len=16), batch_size=20, num_workers=4)
+    train_dataloader = DataLoader(VideoDataset(dataset=dataset, split='train',clip_len=8), batch_size=20, shuffle=True, num_workers=4)
+    val_dataloader   = DataLoader(VideoDataset(dataset=dataset, split='val',  clip_len=8), batch_size=20, num_workers=4)
+    test_dataloader  = DataLoader(VideoDataset(dataset=dataset, split='test', clip_len=8), batch_size=20, num_workers=4)
 
     trainval_loaders = {'train': train_dataloader, 'val': val_dataloader}
     trainval_sizes = {x: len(trainval_loaders[x].dataset) for x in ['train', 'val']}
@@ -127,27 +139,30 @@ def train_model(dataset=dataset, save_dir=save_dir, num_classes=num_classes, lr=
                 model.eval()
 
             for inputs, labels in tqdm(trainval_loaders[phase]):
-                # move inputs and labels to the device the training is taking place on
-                inputs = Variable(inputs, requires_grad=True).to(device)
-                labels = Variable(labels).to(device)
-                optimizer.zero_grad()
+                if inputs =="err":
+                    pass
+                else :
+                    # move inputs and labels to the device the training is taking place on
+                    inputs = Variable(inputs, requires_grad=True).to(device)
+                    labels = Variable(labels).to(device)
+                    optimizer.zero_grad()
 
-                if phase == 'train':
-                    outputs = model(inputs)
-                else:
-                    with torch.no_grad():
+                    if phase == 'train':
                         outputs = model(inputs)
+                    else:
+                        with torch.no_grad():
+                            outputs = model(inputs)
 
-                probs = nn.Softmax(dim=1)(outputs)
-                preds = torch.max(probs, 1)[1]
-                loss = criterion(outputs, labels)
+                    probs = nn.Softmax(dim=1)(outputs)
+                    preds = torch.max(probs, 1)[1]
+                    loss = criterion(outputs, labels)
 
-                if phase == 'train':
-                    loss.backward()
-                    optimizer.step()
+                    if phase == 'train':
+                        loss.backward()
+                        optimizer.step()
 
-                running_loss += loss.item() * inputs.size(0)
-                running_corrects += torch.sum(preds == labels.data)
+                    running_loss += loss.item() * inputs.size(0)
+                    running_corrects += torch.sum(preds == labels.data)
 
             epoch_loss = running_loss / trainval_sizes[phase]
             epoch_acc = running_corrects.double() / trainval_sizes[phase]

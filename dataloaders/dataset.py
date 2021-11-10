@@ -82,6 +82,8 @@ class VideoDataset(Dataset):
     def __getitem__(self, index):
         # Loading and preprocessing.
         buffer = self.load_frames(self.fnames[index])
+        if buffer.shape[0] < self.clip_len :
+            buffer = self.load_frames(self.fnames[index-(self.clip_len - buffer.shape[0])])
         buffer = self.crop(buffer, self.clip_len, self.crop_size)
         labels = np.array(self.label_array[index])
 
@@ -90,6 +92,7 @@ class VideoDataset(Dataset):
         #     buffer = self.randomflip(buffer)
         buffer = self.normalize(buffer)
         buffer = self.to_tensor(buffer)
+
         return torch.from_numpy(buffer), torch.from_numpy(labels)
 
     def check_integrity(self):
@@ -146,8 +149,8 @@ class VideoDataset(Dataset):
             if not os.path.exists(test_dir):
                 os.mkdir(test_dir)
 
-            # for video in train:
-            #     self.process_video(video, file, train_dir)
+            for video in train:
+                self.process_video(video, file, train_dir)
 
             for video in val:
                 self.process_video(video, file, val_dir)
@@ -230,7 +233,11 @@ class VideoDataset(Dataset):
 
     def crop(self, buffer, clip_len, crop_size):
         # randomly select time index for temporal jittering
-        time_index = np.random.randint(buffer.shape[0] - clip_len)
+        if buffer.shape[0] < clip_len :
+            time_index = np.random.randint(abs(buffer.shape[0] - clip_len))    
+        else :
+            # print("buffer.shape[0] : ", buffer.shape[0])
+            time_index = np.random.randint(buffer.shape[0] - clip_len)
 
         # Randomly select start indices in order to crop the video
         height_index = np.random.randint(buffer.shape[1] - crop_size)

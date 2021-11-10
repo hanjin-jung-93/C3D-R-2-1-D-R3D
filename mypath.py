@@ -19,9 +19,9 @@ class Path(object):
             return root_dir, output_dir
         elif database == 'mydata':
             # folder that contains class labels
-            root_dir = '/workspace/data/myrawdata'
+            root_dir = '/home/ubuntu/data/dataset'
 
-            output_dir = '/workspace/data/mydata'
+            output_dir = '/home/ubuntu/data/new_dataset'
 
             return root_dir, output_dir
         else:
